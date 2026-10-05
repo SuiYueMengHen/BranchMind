@@ -1,0 +1,29 @@
+# Local data, credentials, and build output
+node_modules/
+.next/
+out/
+build/
+coverage/
+.branchmind/
+.env*
+!.env.example
+*.log
+*.pem
+*.key
+*.p12
+*.pfx
+*.tsbuildinfo
+*.tgz
+.DS_Store
+.vercel/
+.idea/
+.vscode/
+.ace-tool/
+.turbo/
+.eslintcache
+.playwright-mcp/
+release/
+.publish/
+ai-chat-client/docs/live-validation.json
+# Private design / debugging artifacts stay local
+/docs/design/

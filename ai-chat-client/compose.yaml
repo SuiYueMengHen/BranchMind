@@ -1,0 +1,13 @@
+services:
+  branch-mind:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "127.0.0.1:1666:1666"
+    volumes:
+      - branchmind-data:/app/.branchmind
+    environment:
+      BRANCH_MIND_DATA_DIR: /app/.branchmind
+volumes:
+  branchmind-data:
