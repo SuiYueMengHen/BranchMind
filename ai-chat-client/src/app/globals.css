@@ -1850,3 +1850,9 @@ body {
     padding: 7px 5px;
   }
 }
+
+/* Keep the course profile usable on smaller screens. */
+.bm-dialog {
+  max-height: calc(100dvh - 48px);
+  overflow-y: auto;
+}

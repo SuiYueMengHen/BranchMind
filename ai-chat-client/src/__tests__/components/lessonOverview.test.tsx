@@ -37,7 +37,7 @@ it("shows one course-creation action for an unplanned course", () => {
   expect(html).toContain("创建课程章节");
   expect(html).not.toContain("开始学习</button>");
 });
-it("shows start only for a leaf, avoiding an unnecessary refinement action", () => {
+it("keeps both start and refinement for a legacy leaf", () => {
   learning.branches.push({
     ...main,
     id: "lesson",
@@ -51,7 +51,7 @@ it("shows start only for a leaf, avoiding an unnecessary refinement action", () 
   learning.activeBranchId = "lesson";
   const html = renderToStaticMarkup(<LessonOverview />);
   expect(html).toContain("开始学习");
-  expect(html).not.toContain("创建分支");
+  expect(html).toContain("继续细分");
 });
 it("shows child selection for a chapter with subtopics and preserves separate Q&A", () => {
   learning.branches.push(
@@ -97,4 +97,24 @@ it("offers topic entry rather than generation in the initial unnamed workspace",
   expect(html).toContain("创建学习主题");
   expect(html).not.toContain("创建课程章节");
   expect(html).not.toContain("New Chat");
+});
+
+it("renders navigation beyond the old six-level ceiling", () => {
+  let parent = "main";
+  for (let depth = 1; depth <= 30; depth++) {
+    const id = `deep-${depth}`;
+    learning.branches.push({
+      ...main,
+      id,
+      kind: "lesson",
+      parentBranchId: parent,
+      title: `层级 ${depth}`,
+    });
+    parent = id;
+  }
+  const html = renderToStaticMarkup(
+    <CurriculumTree learning={learning} disabled={false} onSelect={() => {}} />,
+  );
+  expect(html).toContain("层级 30");
+  expect(html).toContain('data-depth="30"');
 });

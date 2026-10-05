@@ -63,6 +63,17 @@ export function validateArchive(value: unknown): asserts value is StudyArchive {
         !l.branches.some((b) => b.id === l.activeBranchId)
       )
         throw new Error("学习结构无效");
+      if (
+        l.profile !== undefined &&
+        (!l.profile ||
+          typeof l.profile.learningGoal !== "string" ||
+          typeof l.profile.priorKnowledge !== "string" ||
+          !l.profile.learningGoal.trim() ||
+          !l.profile.priorKnowledge.trim() ||
+          l.profile.learningGoal.length > 4000 ||
+          l.profile.priorKnowledge.length > 4000)
+      )
+        throw new Error("课程学习目标或已有基础无效");
       const branchIds = new Set(l.branches.map((b) => b.id));
       if (branchIds.size !== l.branches.length) throw new Error("答疑分支重复");
       for (const b of l.branches) {

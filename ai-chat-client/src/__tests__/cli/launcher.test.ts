@@ -54,6 +54,6 @@ describe("prompt-tree CLI launcher", () => {
 
     expect(result.status).toBe(0);
     expect(result.stderr).toBe("");
-    expect(result.stdout.trim()).toBe("0.1.0");
+    expect(result.stdout.trim()).toBe("0.1.1");
   });
 });

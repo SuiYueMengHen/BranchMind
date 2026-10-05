@@ -24,7 +24,12 @@ export interface StudyMemory {
   sourceNodeId: string;
   createdAt: number;
 }
+export interface CourseProfile {
+  learningGoal: string;
+  priorKnowledge: string;
+}
 export interface LearningState {
+  profile?: CourseProfile;
   activeBranchId: string;
   branches: StudyBranch[];
   notation: string;

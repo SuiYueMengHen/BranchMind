@@ -61,6 +61,7 @@ export default function LessonOverview() {
             : "先输入一个学习主题，例如量子力学。确认后，AI 会自动规划章节，无需另写提示。"
           : branch.description || "围绕本节主题逐步学习。"}
       </p>
+      {children.length > 0 && <p>选择一个子主题，可继续细分到所需深度。</p>}
       {children.length > 0 ? (
         <div className="bm-lesson-cards">
           {children.map((child, index) => (
@@ -80,10 +81,11 @@ export default function LessonOverview() {
         </div>
       ) : (
         <div className="bm-lesson-overview-actions">
-          {(branch.kind === "main" ||
-            (branch.canExpand !== false && branch.outlineStatus !== "leaf")) && (
+          {
             <button
-              className="bm-primary"
+              className={
+                branch.kind === "main" || branch.canExpand !== false ? "bm-primary" : "bm-secondary"
+              }
               disabled={disabled}
               onClick={() => {
                 if (!hasTopic) window.dispatchEvent(new Event("branchmind:new-course"));
@@ -97,9 +99,9 @@ export default function LessonOverview() {
                   ? hasTopic
                     ? "自动创建课程章节"
                     : "创建学习主题"
-                  : "创建分支"}
+                  : "继续细分"}
             </button>
-          )}
+          }
           {branch.kind === "lesson" && (
             <button
               className={

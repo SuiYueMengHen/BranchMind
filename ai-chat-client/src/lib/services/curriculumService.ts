@@ -1,4 +1,5 @@
 import type { LearningState, StudyBranch } from "@/types/learning";
+import { courseProfilePrompt } from "./learningService";
 import type { Node } from "@/types";
 import { NodeType } from "@/types";
 export interface OutlineItem {
@@ -11,7 +12,6 @@ export interface CourseOutline {
   notation: string;
   children: OutlineItem[];
 }
-export const MAX_LESSON_DEPTH = 6;
 export function lessonPath(learning: LearningState, branch: StudyBranch): StudyBranch[] {
   const path: StudyBranch[] = [];
   const seen = new Set<string>();
@@ -76,6 +76,7 @@ export function planningPrompt(
   return [
     `为课程「${courseTitle}」设计 ${branch.kind === "main" ? "有序章节" : "当前章节的直接子节"}。`,
     `当前章节路径：${path.map((b) => b.title).join(" / ") || "课程总规划"}`,
+    courseProfilePrompt(learning),
     `用户要求：${request || branch.description || "从基础到进阶，适合循序渐进学习"}`,
     `现有课程结构：${learning.branches
       .filter((b) => b.kind !== "question")
@@ -83,10 +84,7 @@ export function planningPrompt(
       .join("\n")}`,
     `沿用课程符号约定：${learning.notation || "为整门课程制定一致的符号约定"}`,
     '仅输出 JSON 对象：{"summary":"规划说明","notation":"统一符号约定","children":[{"title":"章节名","description":"明确的学习目标","canExpand":true}]}。',
-    "只创建下一层，不一次性展开整棵树。通常 3–10 项，最多 20 项；不要包含重复内容。canExpand 表示是否值得继续分成独立小节。能在一份讲义中清晰讲完的末级主题必须为 false。若当前主题已经足够具体，children 返回空数组，并说明可以开始学习。不得为了分层而反复改名创建同义章节。",
-    path.length >= MAX_LESSON_DEPTH - 1
-      ? "达到最大细分层级，所有子节 canExpand 必须为 false。"
-      : "",
+    "只创建下一层，不一次性展开整棵树。通常 3–10 项，最多 20 项；必须返回至少一个有实质学习价值的子主题。用户主动请求细分时，即使此前 canExpand 为 false，也应从定义、假设、证明步骤、计算方法、具体例题或适用边界继续展开；不要只改名重复父主题，不得以达到层数或末级主题为由拒绝。canExpand 只是是否建议继续细分，不限制用户继续创建。学习目标与用户自述基础必须贯穿规划，避免重复已掌握内容，按需补齐缺失的先修知识。规划说明直接写依据与顺序，禁止寒暄和口语化铺垫。",
     "符号必须与前面约定一致；没有前置符号约定时可提出新约定，不要随意更换同一物理量的符号。",
   ]
     .filter(Boolean)

@@ -1,20 +1,19 @@
 import type { StateCreator } from "zustand";
 import type { AppStoreDeps, AppStoreState } from "./useStore";
-import { getLearningState, hasCourseTopic } from "@/lib/services/learningService";
+import {
+  getLearningState,
+  hasCourseTopic,
+  normalizeCourseProfile,
+} from "@/lib/services/learningService";
 import { NodeType, type Node } from "@/types";
 import { getPrimaryApiKey } from "@/types/provider";
 import { getOpenAIApiKey } from "@/lib/services/apiKeyService";
 import { getOpenAIBaseUrlOrDefault } from "@/lib/services/apiUrlService";
 import { estimateTokens } from "@/lib/services/tokenService";
-import {
-  lessonPath,
-  MAX_LESSON_DEPTH,
-  parseCourseOutline,
-  planningPrompt,
-} from "@/lib/services/curriculumService";
-import type { LearningState, NotePreferences } from "@/types/learning";
+import { parseCourseOutline, planningPrompt } from "@/lib/services/curriculumService";
+import type { CourseProfile, LearningState, NotePreferences } from "@/types/learning";
 export interface LearningSlice {
-  createStudyCourse: (title: string) => Promise<void>;
+  createStudyCourse: (title: string, profile: CourseProfile) => Promise<void>;
   sendStudyQuestion: (content: string) => Promise<void>;
   isPlanning: boolean;
   planningError: string | null;
@@ -32,10 +31,11 @@ export function createLearningSlice(
   deps: AppStoreDeps,
 ): StateCreator<AppStoreState, [], [], LearningSlice> {
   return (set, get) => ({
-    createStudyCourse: async (title) => {
+    createStudyCourse: async (title, profile) => {
       const topic = title.trim();
       if (!topic) throw new Error("请先输入学习主题");
       if (topic.length > 120) throw new Error("学习主题最多 120 个字符");
+      const normalized = normalizeCourseProfile(profile);
       if (get().isSending || get().isPlanning || get().isLoading) return;
       const tree = get().getCurrentTree();
       if (tree && !hasCourseTopic(tree) && get().nodes.size === 1) {
@@ -45,6 +45,8 @@ export function createLearningSlice(
       ) {
         await get().createTree(topic);
       }
+      const current = get().getCurrentTree()!;
+      await get().saveLearning({ ...getLearningState(current, get().nodes), profile: normalized });
       await get().generateStudyOutline();
     },
     sendStudyQuestion: async (content) => {
@@ -70,14 +72,6 @@ export function createLearningSlice(
       if (parent.kind === "question") throw new Error("答疑分支不用于创建课程章节");
       if (learning.branches.some((b) => b.kind === "lesson" && b.parentBranchId === parent.id))
         return;
-      if (
-        parent.kind === "lesson" &&
-        (parent.canExpand === false || parent.outlineStatus === "leaf")
-      )
-        return;
-      const path = lessonPath(learning, parent).filter((b) => b.kind === "lesson");
-      if (path.length >= MAX_LESSON_DEPTH)
-        throw new Error("已经细分到可学习的小节，请点击开始学习");
       set({ isPlanning: true, planningError: null });
       try {
         const selection = get().selectedModels[0];
@@ -123,10 +117,8 @@ export function createLearningSlice(
           ],
         });
         const outline = parseCourseOutline(content);
-        if (learning.branches.length + outline.children.length > 500)
-          throw new Error("课程已有大量章节，请新建课程继续规划");
-        if (parent.kind === "main" && outline.children.length === 0)
-          throw new Error("课程总规划没有返回章节，请重试");
+        if (outline.children.length === 0)
+          throw new Error("模型没有返回子主题，请重试细分；也可以直接开始学习");
         if (get().currentTreeId !== tree.id)
           throw new Error("课程已切换，本次规划未保存，请重新创建");
         const now = Date.now();
@@ -167,10 +159,8 @@ export function createLearningSlice(
           notes: { ...parent.notes },
           resolved: false,
           description: item.description,
-          canExpand: path.length + 1 < MAX_LESSON_DEPTH && item.canExpand,
-          outlineStatus: (item.canExpand && path.length + 1 < MAX_LESSON_DEPTH
-            ? "unplanned"
-            : "leaf") as "unplanned" | "leaf",
+          canExpand: item.canExpand,
+          outlineStatus: (item.canExpand ? "unplanned" : "leaf") as "unplanned" | "leaf",
         }));
         const latest = getLearningState(get().getCurrentTree()!, get().nodes);
         const next = {

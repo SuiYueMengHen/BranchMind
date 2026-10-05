@@ -8,6 +8,10 @@ import { exportStudyArchive, validateArchive } from "@/lib/services/studyArchive
 beforeEach(async () => {
   await deleteDB();
 });
+const profile = {
+  learningGoal: "掌握量子测量及计算",
+  priorKnowledge: "已学线性代数，未学算子理论",
+};
 const chapters = {
   summary: "依次学习态、算符",
   notation: "ℏ 表示约化普朗克常数；态矢量用 |ψ⟩；内积对第二个变量线性。",
@@ -67,9 +71,6 @@ it("creates nested sections, starts a leaf, and shares notation and earlier lect
   expect(leaf.canExpand).toBe(false);
   expect(learning.notation).toContain("ℏ");
   await store.getState().selectStudyBranch(leaf.id);
-  const count = chat.mock.calls.length;
-  await store.getState().generateStudyOutline();
-  expect(chat.mock.calls).toHaveLength(count);
   await store.getState().startStudyLesson();
   expect(store.getState().getCurrentTree()!.learning!.branches.at(-1)!.started).toBe(true);
   const firstLecture = store.getState().getActiveNode()!;
@@ -100,21 +101,24 @@ it("keeps data unchanged after invalid output and allows retry", async () => {
   await store.getState().generateStudyOutline();
   expect(store.getState().getCurrentTree()!.learning!.branches).toHaveLength(3);
 });
-it("marks an already specific topic as a leaf when the model returns no children", async () => {
+it("keeps refinement available after the model returns no children", async () => {
   const { store, chat } = await setup();
   await store.getState().generateStudyOutline();
   const parent = store.getState().getCurrentTree()!.learning!.branches[1];
   await store.getState().selectStudyBranch(parent.id);
+  const before = store.getState().getCurrentTree()!.learning;
   chat.mockResolvedValueOnce(
     JSON.stringify({ summary: "无需继续细分", notation: "", children: [] }),
   );
+  await expect(store.getState().generateStudyOutline()).rejects.toThrow("没有返回子主题");
+  expect(store.getState().getCurrentTree()!.learning).toEqual(before);
   await store.getState().generateStudyOutline();
   expect(
     store
       .getState()
       .getCurrentTree()!
-      .learning!.branches.find((b) => b.id === parent.id)!.outlineStatus,
-  ).toBe("leaf");
+      .learning!.branches.some((b) => b.parentBranchId === parent.id),
+  ).toBe(true);
 });
 it("rejects invalid or duplicate chapters and excludes Q&A from automatic course references", () => {
   expect(() =>
@@ -144,10 +148,10 @@ it("requires an explicit topic before planning and reuses the initial blank work
   const store = createAppStore({ llmService: { chat } });
   await store.getState().initialize();
   const initialId = store.getState().currentTreeId;
-  await expect(store.getState().createStudyCourse("   ")).rejects.toThrow("输入学习主题");
+  await expect(store.getState().createStudyCourse("   ", profile)).rejects.toThrow("输入学习主题");
   await expect(store.getState().generateStudyOutline()).rejects.toThrow("输入学习主题");
   expect(chat).not.toHaveBeenCalled();
-  await store.getState().createStudyCourse("  量子力学  ");
+  await store.getState().createStudyCourse("  量子力学  ", profile);
   expect(store.getState().currentTreeId).toBe(initialId);
   expect(store.getState().trees.size).toBe(1);
   expect(store.getState().getCurrentTree()!.title).toBe("量子力学");
@@ -189,10 +193,73 @@ it("routes free input to independent Q&A, even when the question mentions creati
 it("retries a failed initial plan without creating another course", async () => {
   const { store, chat } = await setup();
   chat.mockRejectedValueOnce(new Error("模型暂时不可用"));
-  await expect(store.getState().createStudyCourse("电动力学")).rejects.toThrow("模型暂时不可用");
+  await expect(store.getState().createStudyCourse("电动力学", profile)).rejects.toThrow(
+    "模型暂时不可用",
+  );
   const id = store.getState().currentTreeId;
   const count = store.getState().trees.size;
-  await store.getState().createStudyCourse("电动力学");
+  await store.getState().createStudyCourse("电动力学", profile);
   expect(store.getState().currentTreeId).toBe(id);
   expect(store.getState().trees.size).toBe(count);
+});
+
+it("refines past twelve levels including legacy leaf flags and restores the deep course", async () => {
+  const { store, chat } = await setup();
+  await store.getState().generateStudyOutline();
+  let parent = store.getState().getCurrentTree()!.learning!.branches[2];
+  expect(parent.canExpand).toBe(false);
+  for (let level = 0; level < 12; level++) {
+    await store.getState().selectStudyBranch(parent.id);
+    chat.mockResolvedValueOnce(
+      JSON.stringify({
+        summary: "继续展开",
+        notation: "",
+        children: [{ title: `细节 ${level}`, description: "推导中的具体条件", canExpand: false }],
+      }),
+    );
+    await store.getState().generateStudyOutline();
+    const child = store.getState().getCurrentTree()!.learning!.branches.at(-1)!;
+    expect(child.parentBranchId).toBe(parent.id);
+    parent = child;
+  }
+  await store.getState().selectStudyBranch(parent.id);
+  await store.getState().startStudyLesson();
+  expect(store.getState().getCurrentTree()!.learning!.branches.at(-1)!.started).toBe(true);
+  validateArchive(await exportStudyArchive());
+  const restored = createAppStore();
+  await restored.getState().initialize();
+  expect(restored.getState().getCurrentTree()!.learning!.branches.at(-1)!.title).toBe("细节 11");
+});
+it("requires both goal and prior knowledge, includes them in planning and teaching, and backs them up", async () => {
+  const { store, chat } = await setup();
+  await expect(
+    store.getState().createStudyCourse("量子力学", { learningGoal: "", priorKnowledge: "零基础" }),
+  ).rejects.toThrow("需要学什么");
+  await expect(
+    store
+      .getState()
+      .createStudyCourse("量子力学", { learningGoal: "学习测量", priorKnowledge: "" }),
+  ).rejects.toThrow("掌握什么");
+  expect(chat).not.toHaveBeenCalled();
+  await store.getState().createStudyCourse("量子力学", profile);
+  expect(JSON.stringify(chat.mock.calls.at(-1)![0].messages)).toContain(profile.priorKnowledge);
+  const learning = store.getState().getCurrentTree()!.learning!;
+  expect(learning.profile).toEqual(profile);
+  await store.getState().selectStudyBranch(learning.branches[2].id);
+  await store.getState().startStudyLesson();
+  const messages = JSON.stringify(chat.mock.calls.at(-1)![0].messages);
+  expect(messages).toContain(profile.learningGoal);
+  expect(messages).toContain(profile.priorKnowledge);
+  const archive = await exportStudyArchive();
+  validateArchive(archive);
+  const restored = createAppStore();
+  await restored.getState().initialize();
+  expect(restored.getState().getCurrentTree()!.learning!.profile).toEqual(profile);
+  const invalid = structuredClone(archive);
+  (
+    invalid.stores.trees.find((t) => t.id === store.getState().currentTreeId)!.learning as {
+      profile: unknown;
+    }
+  ).profile = { learningGoal: 5, priorKnowledge: "" };
+  expect(() => validateArchive(invalid)).toThrow("已有基础");
 });

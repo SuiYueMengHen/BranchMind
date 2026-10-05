@@ -3,8 +3,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { appStore, useAppStore } from "@/store/useStore";
 import { ChatView } from "@/components/chat/ChatView";
-import { getLearningState, NOTE_STYLES } from "@/lib/services/learningService";
-import type { LearningState, NotePreferences, StudyBranch } from "@/types/learning";
+import {
+  getLearningState,
+  normalizeCourseProfile,
+  NOTE_STYLES,
+} from "@/lib/services/learningService";
+import type { CourseProfile, LearningState, NotePreferences, StudyBranch } from "@/types/learning";
+import { CourseProfileFields } from "./CourseProfileFields";
 import SyncPanel from "./SyncPanel";
 import InstallSupport from "./InstallSupport";
 import { CurriculumTree } from "./CurriculumTree";
@@ -14,6 +19,9 @@ function Preferences({ learning, branch }: { learning: LearningState; branch: St
   const saveLearning = useAppStore((s) => s.saveLearning);
   const sending = useAppStore((s) => s.isSending || s.isPlanning);
   const [notes, setNotes] = useState<NotePreferences>(branch.notes);
+  const [profile, setProfile] = useState<CourseProfile>(
+    learning.profile ?? { learningGoal: "", priorKnowledge: "" },
+  );
   const [notation, setNotation] = useState(learning.notation);
   const [status, setStatus] = useState("");
   const [saving, setSaving] = useState(false);
@@ -54,7 +62,7 @@ function Preferences({ learning, branch }: { learning: LearningState; branch: St
       <div className="bm-note-preview">
         {notes.style === "rigorous" ? (
           <>
-            定义 01 · 希尔伯特空间（Hilbert space）
+            定义 1（希尔伯特空间，Hilbert Space）：
             <br />
             <span>在内积诱导的范数下完备的内积空间。</span>
           </>
@@ -76,6 +84,7 @@ function Preferences({ learning, branch }: { learning: LearningState; branch: St
           placeholder="例如：定义编号；证明不跳步；公式后解释每个符号。"
         />
       </label>
+      <CourseProfileFields value={profile} onChange={setProfile} disabled={sending || saving} />
       <label className="bm-label">
         课程共享符号约定
         <textarea
@@ -103,6 +112,9 @@ function Preferences({ learning, branch }: { learning: LearningState; branch: St
               await saveLearning({
                 ...latest,
                 notation,
+                ...(profile.learningGoal.trim() || profile.priorKnowledge.trim() || latest.profile
+                  ? { profile: normalizeCourseProfile(profile) }
+                  : {}),
                 branches: latest.branches.map((b) => (b.id === branch.id ? { ...b, notes } : b)),
               });
               setStatus("已保存，将用于后续讲义");
@@ -146,6 +158,10 @@ export default function LearningWorkspace() {
   const navRef = useRef<HTMLElement>(null);
   const [newCourse, setNewCourse] = useState(false);
   const [courseTitle, setCourseTitle] = useState("");
+  const [courseProfile, setCourseProfile] = useState<CourseProfile>({
+    learningGoal: "",
+    priorKnowledge: "",
+  });
   const [questionSource, setQuestionSource] = useState<string | null>(null);
   const [questionTitle, setQuestionTitle] = useState("");
   const [memorySource, setMemorySource] = useState<string | null>(null);
@@ -172,6 +188,7 @@ export default function LearningWorkspace() {
     };
     const newTopic = () => {
       setCourseTitle("");
+      setCourseProfile({ learningGoal: "", priorKnowledge: "" });
       setActionError("");
       setNewCourse(true);
     };
@@ -357,6 +374,7 @@ export default function LearningWorkspace() {
           onClick={() => {
             setNewCourse(true);
             setCourseTitle("");
+            setCourseProfile({ learningGoal: "", priorKnowledge: "" });
             setActionError("");
           }}
         >
@@ -653,13 +671,13 @@ export default function LearningWorkspace() {
           >
             <div className="bm-eyebrow">从一个主题开始</div>
             <h2 id="bm-topic-title">你想学习什么？</h2>
-            <p>输入课程主题，AI 会自动规划章节。后续的小主题也会按所属章节自动生成。</p>
+            <p>填写学习目标和已有基础，AI 据此安排先修知识、章节顺序与讲解深度。</p>
             <form
               onSubmit={(e) => {
                 e.preventDefault();
                 if (!courseTitle.trim() || working || sending) return;
                 void action(async () => {
-                  await createCourse(courseTitle);
+                  await createCourse(courseTitle, courseProfile);
                   setNewCourse(false);
                   setNavOpen(false);
                 });
@@ -669,6 +687,7 @@ export default function LearningWorkspace() {
                 学习主题
                 <input
                   autoFocus
+                  required
                   value={courseTitle}
                   onChange={(e) => setCourseTitle(e.target.value)}
                   placeholder="例如：量子力学"
@@ -676,6 +695,12 @@ export default function LearningWorkspace() {
                   disabled={working}
                 />
               </label>
+              <CourseProfileFields
+                value={courseProfile}
+                onChange={setCourseProfile}
+                required
+                disabled={working}
+              />
               {actionError && (
                 <p role="alert" className="bm-error">
                   {actionError}
@@ -685,7 +710,16 @@ export default function LearningWorkspace() {
                 <button type="button" disabled={working} onClick={() => setNewCourse(false)}>
                   取消
                 </button>
-                <button className="bm-primary" disabled={working || sending || !courseTitle.trim()}>
+                <button
+                  className="bm-primary"
+                  disabled={
+                    working ||
+                    sending ||
+                    !courseTitle.trim() ||
+                    !courseProfile.learningGoal.trim() ||
+                    !courseProfile.priorKnowledge.trim()
+                  }
+                >
                   {working ? "正在自动规划章节…" : "确认主题并创建章节"}
                 </button>
               </div>

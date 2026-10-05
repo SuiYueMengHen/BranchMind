@@ -2,14 +2,14 @@
 
 **A learning path for the course. A separate branch for every question.**
 
-Branch Mind is an AI learning workspace with automatically generated course chapters, nested topics, independent Q&A, and shared notation. Version **0.1.0** is a web application and installable PWA built on [Prompt Tree](https://github.com/yxp934/Prompt-Tree).
+Branch Mind is an AI learning workspace with automatically generated course chapters, nested topics, independent Q&A, and shared notation. Version **0.1.1** is a web application and installable PWA built on [Prompt Tree](https://github.com/yxp934/Prompt-Tree).
 
 [中文说明](README.zh-CN.md) · [Detailed usage and deployment](ai-chat-client/docs/BRANCH_MIND.md) · [Changelog](CHANGELOG.md)
 
 ## Features
 
-- **Topic first:** click “New learning topic”, enter a subject, and confirm. AI then creates the first chapter layer.
-- **Automatic refinement:** select a chapter and create subtopics without writing another prompt. Supports up to six topic levels; sufficiently specific topics offer “Start learning”.
+- **Topic first:** enter a subject, what you want to learn, and what you already know. AI plans chapters and prerequisite coverage from this profile. You can update it in the course note settings.
+- **Automatic refinement:** select a chapter and create subtopics without writing another prompt. There is no fixed topic-depth limit. Model leaf suggestions never prevent further refinement, and specific topics also offer “Start learning”.
 - **Independent Q&A:** free input opens a question branch from the current lesson. Follow-up questions stay there, while the learning path retains its position.
 - **Lecture styles:** rigorous, intuitive, concise, and custom, with optional Chinese/English terminology and per-lecture overrides. Markdown and LaTeX formulas are supported.
 - **Course continuity:** shared notation, confirmed study notes, and bounded references to earlier lectures are included in later lessons. Raw Q&A is kept in its own branch.
@@ -41,7 +41,7 @@ Keep using the same hostname and port: `localhost` and `127.0.0.1` have separate
 
 ## Workflow
 
-1. Create a topic such as quantum mechanics and confirm the name.
+1. Create a topic such as quantum mechanics, describe your learning goal and prior knowledge (or explicitly state no prior knowledge), and confirm.
 2. Choose an automatically generated chapter.
 3. Create subtopics, or start learning when the topic is specific enough.
 4. Type a question in the bottom composer to open independent Q&A.
@@ -88,7 +88,7 @@ npm run test:run
 npm run build
 ```
 
-The default test suite does not call paid model APIs. The opt-in live integration test requires an explicitly supplied private config file. Version 0.1.0 has 112 passing offline tests; live DeepSeek verification covers provider checks, streaming, chapter planning/refinement, lecture generation, and context continuity. Mathematical correctness still requires subject-specific review.
+The default test suite does not call paid model APIs. The opt-in live integration test requires an explicitly supplied private config file. Version 0.1.1 has 117 passing offline tests, including deep-topic navigation, refinement beyond twelve levels, and persistent learner profiles. Earlier live DeepSeek verification covers provider checks, streaming, chapter planning/refinement, lecture generation, and context continuity. Mathematical correctness still requires subject-specific review.
 
 ## Project layout
 
