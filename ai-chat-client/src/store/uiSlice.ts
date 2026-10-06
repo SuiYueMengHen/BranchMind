@@ -1,3 +1,8 @@
+import {
+  clampLectureFont,
+  getLectureFont,
+  saveLectureFont,
+} from "@/lib/services/readingPreferences";
 import type { StateCreator } from "zustand";
 
 import { getStoredLocale, setStoredLocale, type Locale } from "@/lib/services/localeService";
@@ -6,6 +11,8 @@ import { getStoredTheme, setStoredTheme, type ThemeMode } from "@/lib/services/t
 import type { AppStoreState } from "./useStore";
 
 export interface UISlice {
+  lectureFontSize: number;
+  setLectureFontSize: (size: number) => void;
   sidebarOpen: boolean;
   theme: ThemeMode;
   locale: Locale;
@@ -25,6 +32,12 @@ export interface UISlice {
 
 export function createUISlice(): StateCreator<AppStoreState, [], [], UISlice> {
   return (set) => ({
+    lectureFontSize: 16,
+    setLectureFontSize: (size) => {
+      const value = clampLectureFont(size);
+      saveLectureFont(value);
+      set({ lectureFontSize: value });
+    },
     sidebarOpen: true,
     theme: "light",
     locale: "zh-CN",
@@ -33,7 +46,7 @@ export function createUISlice(): StateCreator<AppStoreState, [], [], UISlice> {
       set((state) => {
         const theme = getStoredTheme() ?? state.theme;
         const locale = getStoredLocale() ?? state.locale;
-        return { theme, locale };
+        return { theme, locale, lectureFontSize: getLectureFont() };
       }),
     toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
     setSidebarOpen: (open) => set({ sidebarOpen: open }),
@@ -54,8 +67,7 @@ export function createUISlice(): StateCreator<AppStoreState, [], [], UISlice> {
         return { theme: nextTheme };
       }),
     contextPanelOpen: true,
-    toggleContextPanel: () =>
-      set((state) => ({ contextPanelOpen: !state.contextPanelOpen })),
+    toggleContextPanel: () => set((state) => ({ contextPanelOpen: !state.contextPanelOpen })),
     setContextPanelOpen: (open) => set({ contextPanelOpen: open }),
     openCompression: () => set({ compressionOpen: true }),
     closeCompression: () => set({ compressionOpen: false }),

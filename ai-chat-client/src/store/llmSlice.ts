@@ -1339,7 +1339,7 @@ export function createLLMSlice(deps: AppStoreDeps): StateCreator<AppStoreState, 
         set((state) => {
           const nodes = new Map(state.nodes);
           nodes.set(assistantNode.id, assistantNode);
-          return { nodes };
+          return { nodes, activeNodeId: assistantNode.id };
         });
 
         let content = "";
@@ -1352,7 +1352,7 @@ export function createLLMSlice(deps: AppStoreDeps): StateCreator<AppStoreState, 
         };
 
         try {
-          await deps.llmService.chat({
+          const complete = await deps.llmService.chat({
             messages: injectToolInstructionMessages(messages, toolUses, toolSettings),
             model: request.modelId,
             temperature: get().temperature,
@@ -1365,6 +1365,7 @@ export function createLLMSlice(deps: AppStoreDeps): StateCreator<AppStoreState, 
               flush();
             },
           });
+          if (!content && complete) content = complete;
         } catch (err) {
           if (!content) {
             await deps.nodeService.delete(assistantNode.id);
@@ -1373,6 +1374,22 @@ export function createLLMSlice(deps: AppStoreDeps): StateCreator<AppStoreState, 
               nodes.delete(assistantNode.id);
               return { nodes };
             });
+          } else {
+            flush(true);
+            const updated = await deps.nodeService.update(assistantNode.id, {
+              content,
+              metadata: { notePreferences: get().nodes.get(parentId)?.metadata.notePreferences },
+            });
+            set((state) => ({
+              nodes: new Map(state.nodes).set(updated.id, updated),
+              activeNodeId: updated.id,
+            }));
+            await get().addToContext(updated.id);
+            const tree = get().getCurrentTree();
+            if (tree) {
+              const learning = getLearningState(tree, get().nodes);
+              await get().recordStudyTip(tree.id, learning.activeBranchId, updated.id);
+            }
           }
           throw err;
         }

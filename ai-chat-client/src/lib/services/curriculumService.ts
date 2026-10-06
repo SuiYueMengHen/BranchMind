@@ -36,33 +36,34 @@ export function parseCourseOutline(text: string): CourseOutline {
   }
   if (!raw || typeof raw !== "object") throw new Error("课程大纲格式无效");
   const value = raw as Partial<CourseOutline>;
-  if (
-    typeof value.summary !== "string" ||
-    typeof value.notation !== "string" ||
-    !Array.isArray(value.children) ||
-    value.children.length > 20
-  )
+  if (!Array.isArray(value.children) || value.children.length > 20)
     throw new Error("大纲需包含说明、符号约定和最多 20 个章节");
   const titles = new Set<string>();
-  const children = value.children.map((item) => {
-    if (
-      !item ||
-      typeof item.title !== "string" ||
-      !item.title.trim() ||
-      item.title.length > 120 ||
-      typeof item.description !== "string" ||
-      item.description.length > 2000 ||
-      typeof item.canExpand !== "boolean"
-    )
-      throw new Error("章节名称、目标或可细分标记无效");
-    const title = item.title.trim();
+  const children = value.children.map((rawItem, index) => {
+    const item =
+      typeof rawItem === "string"
+        ? { title: rawItem }
+        : (rawItem as unknown as Record<string, unknown>);
+    if (!item || typeof item !== "object")
+      throw new Error(`第 ${index + 1} 个子主题格式无效，请重新细分`);
+    const rawTitle = item.title ?? item.name;
+    if (typeof rawTitle !== "string" || !rawTitle.trim())
+      throw new Error(`第 ${index + 1} 个子主题缺少名称，请重新细分`);
+    const title = rawTitle.trim();
+    if (title.length > 120) throw new Error(`第 ${index + 1} 个子主题名称超过 120 字，请重新细分`);
+    const goal = item.description ?? item.goal ?? item.learningGoal ?? "";
+    if (typeof goal !== "string")
+      throw new Error(`第 ${index + 1} 个子主题的学习目标应为文本，请重新细分`);
+    // Advisory field only: missing or non-boolean suggestions must not block refinement.
+    const suggestion = item.canExpand;
+    const canExpand = !(suggestion === false || suggestion === 0 || suggestion === "false");
     if (titles.has(title)) throw new Error("模型返回了重复章节，请重试");
     titles.add(title);
-    return { title, description: item.description.trim(), canExpand: item.canExpand };
+    return { title, description: goal.trim().slice(0, 2000), canExpand };
   });
   return {
-    summary: value.summary.slice(0, 6000),
-    notation: value.notation.slice(0, 6000),
+    summary: typeof value.summary === "string" ? value.summary.slice(0, 6000) : "",
+    notation: typeof value.notation === "string" ? value.notation.slice(0, 6000) : "",
     children,
   };
 }

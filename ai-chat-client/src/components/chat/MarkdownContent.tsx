@@ -1,5 +1,6 @@
 "use client";
 
+import { normalizeLectureMarkdown } from "@/lib/services/markdownService";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -12,7 +13,7 @@ interface MarkdownContentProps {
 export function MarkdownContent({ content }: MarkdownContentProps) {
   return (
     <ReactMarkdown
-      remarkPlugins={[remarkGfm, remarkMath]}
+      remarkPlugins={[remarkGfm, [remarkMath, { singleDollarTextMath: true }]]}
       rehypePlugins={[rehypeKatex]}
       components={{
         p: ({ children, ...props }) => (
@@ -27,7 +28,7 @@ export function MarkdownContent({ content }: MarkdownContentProps) {
         ),
       }}
     >
-      {content}
+      {normalizeLectureMarkdown(content)}
     </ReactMarkdown>
   );
 }

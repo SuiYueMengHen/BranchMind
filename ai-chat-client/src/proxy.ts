@@ -8,6 +8,7 @@ export function proxy(req: NextRequest) {
   if (
     pathname === "/connect" ||
     pathname === "/api/study-session" ||
+    pathname === "/api/status" ||
     pathname.startsWith("/_next/") ||
     pathname.startsWith("/icon") ||
     pathname === "/manifest.webmanifest" ||

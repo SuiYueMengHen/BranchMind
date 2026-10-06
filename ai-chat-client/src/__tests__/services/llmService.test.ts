@@ -114,6 +114,19 @@ describe("LLMService", () => {
     );
   });
 
+  it("explains Safari Load failed without retrying a paid request", async () => {
+    const request = vi.fn().mockRejectedValue(new TypeError("Load failed"));
+    vi.stubGlobal("fetch", request);
+    await expect(new LLMService().chat({ messages: [] })).rejects.toThrow("npm run start:local");
+    expect(request).toHaveBeenCalledTimes(1);
+  });
+
+  it("preserves user cancellation", async () => {
+    const error = new DOMException("Cancelled", "AbortError");
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(error));
+    await expect(new LLMService().chat({ messages: [] })).rejects.toBe(error);
+  });
+
   it("throws when response payload is invalid", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
@@ -127,5 +140,78 @@ describe("LLMService", () => {
     await expect(service.chat({ messages: [{ role: "user", content: "hi" }] })).rejects.toThrow(
       /Invalid LLM response/,
     );
+  });
+});
+
+describe("stream integrity", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  function mockStream(text: string) {
+    const bytes = new TextEncoder().encode(text);
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        for (const byte of bytes) controller.enqueue(new Uint8Array([byte]));
+        controller.close();
+      },
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(body, { headers: { "Content-Type": "text/event-stream" } })),
+    );
+  }
+  const params = {
+    apiKey: "mock-key",
+    baseUrl: "https://example.com",
+    messages: [{ role: "user" as const, content: "讲解" }],
+    stream: true,
+  };
+  it("keeps split Chinese UTF-8 bytes and a final event without a blank terminator", async () => {
+    mockStream(
+      'data: {"choices":[{"delta":{"content":"中文讲义：$$"}}]}\r\n\r\ndata: {"choices":[{"delta":{"content":"x=1$$"},"finish_reason":"stop"}]}',
+    );
+    const chunks: string[] = [];
+    const result = await new LLMService().chat({ ...params, onToken: (s) => chunks.push(s) });
+    expect(result).toBe("中文讲义：$$x=1$$");
+    expect(chunks.join("")).toBe(result);
+    expect(result).not.toContain("�");
+  });
+  it("reports length truncation while keeping delivered partial tokens", async () => {
+    mockStream(
+      'data: {"choices":[{"delta":{"content":"$$x"},"finish_reason":"length"}]}\n\ndata: [DONE]\n\n',
+    );
+    const chunks: string[] = [];
+    await expect(
+      new LLMService().chat({ ...params, onToken: (s) => chunks.push(s) }),
+    ).rejects.toThrow("长度上限");
+    expect(chunks.join("")).toBe("$$x");
+  });
+  it("reports malformed SSE instead of silently dropping closing tokens", async () => {
+    mockStream("data: {broken json}\n\n");
+    await expect(new LLMService().chat(params)).rejects.toThrow("数据流格式异常");
+  });
+  it("detects unexpected stream termination", async () => {
+    mockStream('data: {"choices":[{"delta":{"content":"未完成"}}]}\n\n');
+    await expect(new LLMService().chat(params)).rejects.toThrow("意外中断");
+  });
+
+  it("reports a dropped connection and keeps the received text", async () => {
+    let reads = 0;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (reads++ === 0) {
+          controller.enqueue(
+            new TextEncoder().encode('data: {"choices":[{"delta":{"content":"已接收讲义"}}]}\n\n'),
+          );
+        } else controller.error(new TypeError("Load failed"));
+      },
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(body)),
+    );
+    const chunks: string[] = [];
+    await expect(
+      new LLMService().chat({ ...params, onToken: (s) => chunks.push(s) }),
+    ).rejects.toThrow("模型输出连接中断");
+    expect(chunks.join("")).toBe("已接收讲义");
   });
 });

@@ -10,6 +10,8 @@ import { useAppStore } from "@/store/useStore";
 import { useT } from "@/lib/i18n/useT";
 import { stripModelThinkingTags } from "@/lib/services/messageContentService";
 
+import { readArticleSelection } from "@/lib/services/articleSelection";
+import { normalizeLectureMarkdown } from "@/lib/services/markdownService";
 import { MarkdownContent } from "./MarkdownContent";
 
 interface MessageItemProps {
@@ -103,6 +105,8 @@ export function MessageItem({ node }: MessageItemProps) {
   const isUser = node.type === NodeType.USER;
   const retryAssistant = useAppStore((s) => s.retryAssistant);
   const mcpServers = useAppStore((s) => s.toolSettings.mcp.servers);
+  const [selectedQuote, setSelectedQuote] = useState("");
+  const articleRef = useRef<HTMLDivElement>(null);
   const [copied, setCopied] = useState(false);
   const [toolsOpen, setToolsOpen] = useState(false);
   const copyTimeoutRef = useRef<number | null>(null);
@@ -115,6 +119,16 @@ export function MessageItem({ node }: MessageItemProps) {
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (!isAssistant) return;
+    const capture = () => {
+      if (articleRef.current)
+        setSelectedQuote(readArticleSelection(window.getSelection(), articleRef.current));
+    };
+    document.addEventListener("selectionchange", capture);
+    return () => document.removeEventListener("selectionchange", capture);
+  }, [isAssistant]);
 
   return (
     <div
@@ -169,13 +183,35 @@ export function MessageItem({ node }: MessageItemProps) {
         </div>
       ) : null}
 
-      <div className="prose-prompt-tree text-charcoal pl-11 text-[0.95rem] leading-relaxed">
+      <div
+        ref={articleRef}
+        className="prose-prompt-tree text-charcoal pl-11 text-[0.95rem] leading-relaxed"
+      >
         {isAssistant && isSending && !displayBody.trim() ? (
           <span className="text-sand font-mono text-[0.85rem]">{t("chat.thinking")}</span>
         ) : (
           <MarkdownContent content={displayBody} />
         )}
       </div>
+
+      {isAssistant && selectedQuote && !isSending && (
+        <div className="bm-selection-action" role="status">
+          <span title={selectedQuote}>{selectedQuote.slice(0, 100)}</span>
+          <button
+            type="button"
+            onPointerDown={(e) => e.preventDefault()}
+            onClick={() => {
+              window.dispatchEvent(
+                new CustomEvent("branchmind:question", {
+                  detail: { nodeId: node.id, quote: selectedQuote },
+                }),
+              );
+            }}
+          >
+            针对选段答疑
+          </button>
+        </div>
+      )}
 
       {isAssistant && toolLogs.length > 0 ? (
         <div className="mt-4 pl-11">
@@ -269,9 +305,14 @@ export function MessageItem({ node }: MessageItemProps) {
           <button
             type="button"
             disabled={isSending}
+            onPointerDown={(e) => {
+              if (selectedQuote) e.preventDefault();
+            }}
             onClick={() =>
               window.dispatchEvent(
-                new CustomEvent("branchmind:question", { detail: { nodeId: node.id } }),
+                new CustomEvent("branchmind:question", {
+                  detail: { nodeId: node.id, quote: selectedQuote || undefined },
+                }),
               )
             }
           >
@@ -295,7 +336,9 @@ export function MessageItem({ node }: MessageItemProps) {
             disabled={isSending}
             onClick={() => {
               const url = URL.createObjectURL(
-                new Blob([displayBody], { type: "text/markdown;charset=utf-8" }),
+                new Blob([normalizeLectureMarkdown(displayBody)], {
+                  type: "text/markdown;charset=utf-8",
+                }),
               );
               const a = document.createElement("a");
               a.href = url;

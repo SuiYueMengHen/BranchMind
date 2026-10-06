@@ -2,7 +2,7 @@
 
 **A learning path for the course. A separate branch for every question.**
 
-Branch Mind is an AI learning workspace with automatically generated course chapters, nested topics, independent Q&A, and shared notation. Version **0.1.1** is a web application and installable PWA built on [Prompt Tree](https://github.com/yxp934/Prompt-Tree).
+Branch Mind is an AI learning workspace with automatically generated course chapters, nested topics, independent Q&A, and shared notation. Version **0.1.2** is a web application and installable PWA built on [Prompt Tree](https://github.com/yxp934/Prompt-Tree).
 
 [中文说明](README.zh-CN.md) · [Detailed usage and deployment](ai-chat-client/docs/BRANCH_MIND.md) · [Changelog](CHANGELOG.md)
 
@@ -16,6 +16,8 @@ Branch Mind is an AI learning workspace with automatically generated course chap
 - **DeepSeek by default:** configure your own API key in Settings. Other OpenAI-compatible providers are supported.
 - **Portable study data:** local IndexedDB storage, JSON backup/restore, and optional authenticated server synchronization with revision conflict checks.
 - **Desktop and mobile:** responsive light/dark interface and PWA support for compatible browsers on Windows, macOS, and Android.
+
+Reading supports adjustable 12–28 px text, centered display equations, and Q&A branches grounded in selected lecture text.
 
 ## Quick start
 
@@ -34,8 +36,10 @@ For production:
 
 ```sh
 npm run build
-npm start
+npm run start:local
 ```
+
+`start:local` keeps the local server running in the background after the terminal closes. Repeated launches reuse the existing service. The launcher prints a stop command; run it again after reboot.
 
 Keep using the same hostname and port: `localhost` and `127.0.0.1` have separate browser storage. The Node server must be running for model requests. The CLI also accepts `npm start -- --port 1666`.
 
@@ -88,7 +92,7 @@ npm run test:run
 npm run build
 ```
 
-The default test suite does not call paid model APIs. The opt-in live integration test requires an explicitly supplied private config file. Version 0.1.1 has 117 passing offline tests, including deep-topic navigation, refinement beyond twelve levels, and persistent learner profiles. Earlier live DeepSeek verification covers provider checks, streaming, chapter planning/refinement, lecture generation, and context continuity. Mathematical correctness still requires subject-specific review.
+The default test suite does not call paid model APIs. The opt-in live integration test requires an explicitly supplied private config file. Version 0.1.2 has 133 passing offline tests, including deep-topic navigation, refinement beyond twelve levels, and persistent learner profiles. Earlier live DeepSeek verification covers provider checks, streaming, chapter planning/refinement, lecture generation, and context continuity. Mathematical correctness still requires subject-specific review.
 
 ## Project layout
 

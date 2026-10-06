@@ -13,6 +13,7 @@ export interface StudyBranch {
   tipNodeId: string;
   notes: NotePreferences;
   resolved: boolean;
+  questionQuote?: string;
   description?: string;
   canExpand?: boolean;
   outlineStatus?: "unplanned" | "ready" | "leaf";

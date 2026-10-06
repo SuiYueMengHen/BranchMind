@@ -1856,3 +1856,115 @@ body {
   max-height: calc(100dvh - 48px);
   overflow-y: auto;
 }
+
+/* Reader preferences override desktop/mobile fixed sizes. */
+.bm-app .bm-assistant-message .prose-prompt-tree {
+  font-size: var(--lecture-font-size, 16px);
+}
+.bm-app .bm-assistant-message .prose-prompt-tree h1 {
+  font-size: 1.8em;
+}
+.bm-app .bm-assistant-message .prose-prompt-tree h2 {
+  font-size: 1.4em;
+}
+.bm-app .bm-assistant-message .prose-prompt-tree h3 {
+  font-size: 1.15em;
+}
+.prose-prompt-tree .katex-display {
+  display: block;
+  width: 100%;
+  text-align: center;
+}
+.prose-prompt-tree .katex-display > .katex {
+  min-width: max-content;
+  width: 100%;
+  display: block;
+  text-align: center;
+}
+.bm-reading-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 24px;
+  border-bottom: 1px solid var(--parchment);
+  font-size: 12px;
+  color: var(--sand);
+}
+.bm-reading-controls label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.bm-reading-controls input[type="range"] {
+  width: 100px;
+  accent-color: var(--copper);
+}
+.bm-reading-controls input[type="number"] {
+  width: 48px;
+  padding: 3px;
+  border: 1px solid var(--parchment);
+  border-radius: 4px;
+  color: var(--ink);
+}
+.bm-reading-controls button {
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+.bm-selected-quote {
+  margin: 12px 0;
+  padding: 12px 16px;
+  border-left: 3px solid var(--copper);
+  background: var(--paper);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 200px;
+  overflow-y: auto;
+}
+.bm-selection-action {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 12px 0;
+  padding: 10px 12px;
+  background: var(--paper);
+  border: 1px solid var(--parchment);
+  border-radius: 8px;
+  font-size: 12px;
+}
+.bm-selection-action span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--sand);
+}
+.bm-selection-action button {
+  flex-shrink: 0;
+  color: var(--copper);
+  padding: 6px;
+}
+
+.bm-app .bm-assistant-message .prose-prompt-tree h4 {
+  font-size: 1.1em;
+}
+.bm-app .bm-assistant-message .prose-prompt-tree h5 {
+  font-size: 1em;
+}
+.bm-app .bm-assistant-message .prose-prompt-tree h6 {
+  font-size: 0.9em;
+}
+.bm-app .bm-assistant-message .prose-prompt-tree pre {
+  font-size: 0.85em;
+}
+
+.bm-reading-hint {
+  margin-right: auto;
+}
+@media (max-width: 640px) {
+  .bm-reading-hint {
+    width: 100%;
+  }
+}

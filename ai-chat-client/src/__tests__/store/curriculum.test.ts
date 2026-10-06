@@ -127,7 +127,7 @@ it("rejects invalid or duplicate chapters and excludes Q&A from automatic course
     ),
   ).toThrow("重复");
   expect(() =>
-    parseCourseOutline(JSON.stringify({ ...chapters, children: [{ title: "无标记" }] })),
+    parseCourseOutline(JSON.stringify({ ...chapters, children: [{ description: "缺少名称" }] })),
   ).toThrow();
   const main = {
     id: "main",
@@ -262,4 +262,51 @@ it("requires both goal and prior knowledge, includes them in planning and teachi
     }
   ).profile = { learningGoal: 5, priorKnowledge: "" };
   expect(() => validateArchive(invalid)).toThrow("已有基础");
+});
+
+it("normalizes optional model advice and goal aliases without blocking refinement", () => {
+  const outline = parseCourseOutline(
+    JSON.stringify({
+      children: [
+        { title: "态矢量", goal: "学习态空间", canExpand: "false" },
+        { name: "线性映射", learningGoal: "认识算子" },
+        "谱分解",
+      ],
+    }),
+  );
+  expect(outline.children).toEqual([
+    { title: "态矢量", description: "学习态空间", canExpand: false },
+    { title: "线性映射", description: "认识算子", canExpand: true },
+    { title: "谱分解", description: "", canExpand: true },
+  ]);
+  expect(() =>
+    parseCourseOutline(JSON.stringify({ children: [{ title: " ", description: "" }] })),
+  ).toThrow("第 1 个子主题缺少名称");
+});
+it("saves quoted passages in Q&A context and backup without changing the lesson", async () => {
+  const { store, chat } = await setup();
+  await store.getState().generateStudyOutline();
+  const learning = store.getState().getCurrentTree()!.learning!;
+  const lesson = learning.branches[2];
+  await store.getState().selectStudyBranch(lesson.id);
+  await store.getState().startStudyLesson();
+  const source = store.getState().activeNodeId!;
+  const quote = "测量概率由投影算子给出，为什么需要归一化？";
+  await store.getState().createQuestionBranch(source, "请详细解释这段", quote);
+  await store.getState().sendMessage("这部分我没有看懂，请详细说明");
+  const q = store.getState().getCurrentTree()!.learning!.branches.at(-1)!;
+  expect(q.questionQuote).toBe(quote);
+  expect(JSON.stringify(chat.mock.calls.at(-1)![0].messages)).toContain(quote);
+  expect(
+    store
+      .getState()
+      .getCurrentTree()!
+      .learning!.branches.find((b) => b.id === lesson.id)!.tipNodeId,
+  ).toBe(source);
+  validateArchive(await exportStudyArchive());
+  const restored = createAppStore();
+  await restored.getState().initialize();
+  expect(restored.getState().getCurrentTree()!.learning!.branches.at(-1)!.questionQuote).toBe(
+    quote,
+  );
 });

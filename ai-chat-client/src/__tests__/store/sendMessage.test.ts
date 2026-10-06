@@ -64,9 +64,7 @@ describe("sendMessage flow", () => {
     });
 
     const tree = store.getState().getCurrentTree();
-    const assistantNode = await store
-      .getState()
-      .sendMessage("Hello", [tree!.rootId]);
+    const assistantNode = await store.getState().sendMessage("Hello", [tree!.rootId]);
 
     expect(assistantNode.type).toBe(NodeType.ASSISTANT);
     expect(chatMock.mock.calls.length).toBeGreaterThanOrEqual(1);
@@ -144,9 +142,7 @@ describe("sendMessage flow", () => {
     const box = store.getState().contextBox!;
     const injected = box.blocks.find(
       (b): b is ContextTextFileBlock =>
-        b.kind === "file" &&
-        b.id === RECENT_MESSAGES_BLOCK_ID &&
-        b.fileKind !== "image",
+        b.kind === "file" && b.id === RECENT_MESSAGES_BLOCK_ID && b.fileKind !== "image",
     );
     expect(injected?.content ?? "").toContain("u2");
     expect(injected?.content ?? "").toContain("a2");
@@ -155,7 +151,11 @@ describe("sendMessage flow", () => {
 
     expect(chatMock).toHaveBeenCalled();
     const call = chatMock.mock.calls[0]?.[0];
-    expect(call?.messages.some((m) => m.role === "system" && String(m.content).includes(RECENT_MESSAGES_BLOCK_ID))).toBe(true);
+    expect(
+      call?.messages.some(
+        (m) => m.role === "system" && String(m.content).includes(RECENT_MESSAGES_BLOCK_ID),
+      ),
+    ).toBe(true);
   });
 
   it("refreshes auto memory RAG blocks on every user message", async () => {
@@ -236,7 +236,9 @@ describe("sendMessage flow", () => {
           name: "Writer Provider",
           baseUrl: "https://example.com/v1",
           apiKeys: [{ id: "k1", value: "test-key", isPrimary: true }],
-          models: [{ id: "writer-model", name: "writer-model", enabled: true, supportsStreaming: false }],
+          models: [
+            { id: "writer-model", name: "writer-model", enabled: true, supportsStreaming: false },
+          ],
           enabled: true,
           createdAt: now,
           updatedAt: now,
@@ -287,9 +289,7 @@ describe("sendMessage flow", () => {
       longTermMemorySettings: { ...store.getState().longTermMemorySettings, enabled: false },
     });
 
-    await store
-      .getState()
-      .updateTreeTitle(store.getState().currentTreeId!, "Multi model test");
+    await store.getState().updateTreeTitle(store.getState().currentTreeId!, "Multi model test");
 
     store.setState({
       providers: [
@@ -468,9 +468,49 @@ describe("sendMessage flow", () => {
       },
     });
 
-    await expect(store.getState().sendMessage("Hello")).rejects.toThrow(
-      /does not support vision/i,
-    );
+    await expect(store.getState().sendMessage("Hello")).rejects.toThrow(/does not support vision/i);
     expect(chatMock).not.toHaveBeenCalled();
   });
+});
+
+it("persists the full partial streamed lecture on failure for reload and continuation", async () => {
+  await deleteDB();
+  const partial = "**定义**：\n$$\nx=1";
+  const chat = vi.fn(async (params: ChatParams) => {
+    params.onToken?.("**定义**：\n$$\n");
+    params.onToken?.("x=1");
+    throw new Error("输出达到模型长度上限");
+  });
+  const store = createAppStore({ llmService: { chat } });
+  await store.getState().initialize();
+  store.setState({
+    longTermMemorySettings: { ...store.getState().longTermMemorySettings, enabled: false },
+    providers: [
+      {
+        id: "test",
+        name: "Fixture",
+        baseUrl: "https://example.com",
+        apiKeys: [{ id: "key", value: "mock-key", isPrimary: true }],
+        models: [
+          { id: "model", name: "model", enabled: true, category: "chat", supportsStreaming: true },
+        ],
+        enabled: true,
+        createdAt: 1,
+        updatedAt: 1,
+      },
+    ],
+    selectedModels: [{ providerId: "test", modelId: "model" }],
+  });
+  const tree = store.getState().getCurrentTree()!;
+  const { getLearningState } = await import("@/lib/services/learningService");
+  await store.getState().saveLearning(getLearningState(tree, store.getState().nodes));
+  await expect(store.getState().sendMessage("请讲解")).rejects.toThrow("长度上限");
+  const node = store.getState().getActiveNode()!;
+  expect(node.type).toBe(NodeType.ASSISTANT);
+  expect(node.content).toBe(partial);
+  const persisted = await new NodeService().read(node.id);
+  expect(persisted!.content).toBe(partial);
+  const restored = createAppStore();
+  await restored.getState().initialize();
+  expect(restored.getState().getActiveNode()!.content).toBe(partial);
 });

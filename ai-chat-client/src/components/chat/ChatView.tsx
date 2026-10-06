@@ -1,5 +1,6 @@
 "use client";
 
+import { ReadingControls } from "@/components/learning/ReadingControls";
 import LessonOverview from "@/components/learning/LessonOverview";
 import { getLearningState, hasCourseTopic, NOTE_STYLES } from "@/lib/services/learningService";
 import { useEffect, useMemo } from "react";
@@ -155,14 +156,24 @@ export function ChatView() {
   }
 
   return (
-    <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)_auto] overflow-hidden">
+    <div className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden">
+      <ReadingControls />
       <div className="bm-chat-scroll">
         <MessageList
           key={`${currentTree.id}:${branch?.id}`}
           messages={messages}
           isSending={isSending}
           error={error}
-          beforeMessages={<LessonOverview key={`${currentTree.id}:${branch?.id}`} />}
+          beforeMessages={
+            <>
+              <LessonOverview key={`${currentTree.id}:${branch?.id}`} />
+              {branch?.kind === "question" && branch.questionQuote && (
+                <blockquote className="bm-selected-quote" aria-label="答疑引用原文">
+                  {branch.questionQuote}
+                </blockquote>
+              )}
+            </>
+          }
         />
         {messages.length === 0 && branch?.kind === "question" && (
           <div className="bm-chat-empty">

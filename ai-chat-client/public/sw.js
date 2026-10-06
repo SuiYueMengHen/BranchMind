@@ -1,4 +1,4 @@
-const CACHE = "branchmind-shell-v5";
+const CACHE = "branchmind-shell-v6";
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (event) =>
   event.waitUntil(

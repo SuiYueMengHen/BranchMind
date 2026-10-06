@@ -78,6 +78,11 @@ export function validateArchive(value: unknown): asserts value is StudyArchive {
       if (branchIds.size !== l.branches.length) throw new Error("答疑分支重复");
       for (const b of l.branches) {
         if (
+          b.questionQuote !== undefined &&
+          (typeof b.questionQuote !== "string" || b.questionQuote.length > 12000)
+        )
+          throw new Error("答疑引用原文无效");
+        if (
           !nodes.has(b.sourceNodeId) ||
           !nodes.has(b.tipNodeId) ||
           !b.notes ||

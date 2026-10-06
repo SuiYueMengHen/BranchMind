@@ -149,6 +149,7 @@ export default function LearningWorkspace() {
   const selectBranch = useAppStore((s) => s.selectStudyBranch);
   const createQuestion = useAppStore((s) => s.createQuestionBranch);
   const saveLearning = useAppStore((s) => s.saveLearning);
+  const lectureFontSize = useAppStore((s) => s.lectureFontSize);
   const theme = useAppStore((s) => s.theme);
   const toggleTheme = useAppStore((s) => s.toggleTheme);
   const [navOpen, setNavOpen] = useState(false);
@@ -164,6 +165,7 @@ export default function LearningWorkspace() {
   });
   const [questionSource, setQuestionSource] = useState<string | null>(null);
   const [questionTitle, setQuestionTitle] = useState("");
+  const [questionQuote, setQuestionQuote] = useState("");
   const [memorySource, setMemorySource] = useState<string | null>(null);
   const [memoryText, setMemoryText] = useState("");
   const [actionError, setActionError] = useState("");
@@ -175,9 +177,10 @@ export default function LearningWorkspace() {
   }, [initialize]);
   useEffect(() => {
     const question = (event: Event) => {
-      const d = (event as CustomEvent<{ nodeId: string }>).detail;
+      const d = (event as CustomEvent<{ nodeId: string; quote?: string }>).detail;
       setQuestionSource(d.nodeId);
-      setQuestionTitle("");
+      setQuestionQuote(d.quote ?? "");
+      setQuestionTitle(d.quote ? "这部分我没有看懂，请详细说明。" : "");
       setActionError("");
     };
     const memory = (event: Event) => {
@@ -337,7 +340,10 @@ export default function LearningWorkspace() {
     </div>
   );
   return (
-    <div className="bm-app">
+    <div
+      className="bm-app"
+      style={{ "--lecture-font-size": `${lectureFontSize}px` } as import("react").CSSProperties}
+    >
       <InstallSupport />
       {(navOpen || panelOpen) && (
         <button
@@ -760,9 +766,17 @@ export default function LearningWorkspace() {
                 e.preventDefault();
                 void action(async () => {
                   if (questionSource) {
-                    await createQuestion(questionSource, questionTitle);
+                    await createQuestion(
+                      questionSource,
+                      questionTitle.slice(0, 120),
+                      questionQuote,
+                    );
+                    const request = questionTitle;
+                    const hasQuote = Boolean(questionQuote);
                     setQuestionSource(null);
                     setQuestionTitle("");
+                    setQuestionQuote("");
+                    if (hasQuote) await appStore.getState().sendMessage(request);
                   } else if (memorySource) {
                     await appStore.getState().shareStudyMemory(memorySource, memoryText);
                     setMemorySource(null);
@@ -770,8 +784,13 @@ export default function LearningWorkspace() {
                 });
               }}
             >
+              {questionSource && questionQuote && (
+                <blockquote className="bm-selected-quote" aria-label="选中的原文">
+                  {questionQuote}
+                </blockquote>
+              )}
               <label className="bm-label">
-                {questionSource ? "答疑标题" : "笔记内容"}
+                {questionSource ? (questionQuote ? "关于这段原文的问题" : "答疑标题") : "笔记内容"}
                 {questionSource ? (
                   <input
                     autoFocus
@@ -809,7 +828,13 @@ export default function LearningWorkspace() {
                   取消
                 </button>
                 <button className="bm-primary" disabled={working || sending}>
-                  {working ? "保存中…" : questionSource ? "创建独立答疑" : "确认并共享"}
+                  {working
+                    ? "处理中…"
+                    : questionSource
+                      ? questionQuote
+                        ? "创建答疑并讲解"
+                        : "创建独立答疑"
+                      : "确认并共享"}
                 </button>
               </div>
             </form>
